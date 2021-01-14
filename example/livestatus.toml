@@ -1,0 +1,6 @@
+server = "livestatus.local:50000"
+refresh = 30
+hosts_pattern = [".prod.", ".dev.", ".staging."]
+popup = true
+warnings = true
+debug = false
