@@ -1,5 +1,6 @@
 BIN := waybar-livestatus
-VERSION = 1.0.0
+VERSION := 0.0.1
+VERSION ?= $(VERSION)
 
 PREFIX ?= /usr
 LIB_DIR = $(DESTDIR)$(PREFIX)/lib
@@ -10,7 +11,7 @@ export CGO_CPPFLAGS := ${CPPFLAGS}
 export CGO_CFLAGS := ${CFLAGS}
 export CGO_CXXFLAGS := ${CXXFLAGS}
 export CGO_LDFLAGS := ${LDFLAGS}
-export GOFLAGS := -buildmode=pie -trimpath
+export GOFLAGS := -buildmode=pie -trimpath -mod=readonly -modcacherw
 
 .PHONY: local
 local: vendor build
@@ -21,7 +22,7 @@ run: local
 
 .PHONY: build
 build: main.go helpers/ lql/
-	go build -ldflags "-X main.version=$(VERSION)" -o $(BIN) main.go
+	go build -ldflags "-X main.version=$(VERSION) -linkmode=external" -o $(BIN) main.go
 
 .PHONY: vendor
 vendor:
@@ -86,4 +87,4 @@ dist: clean vendor build
 install:
 	install -Dm755 -t "$(BIN_DIR)/" $(BIN)
 	install -Dm644 -t "$(SHARE_DIR)/licenses/$(BIN)/" LICENSE.md
-	install -Dm644 -t "$(SHARE_DIR)/doc/$(BIN)/" README.md livestatus.toml style.css
+	install -Dm644 -t "$(SHARE_DIR)/doc/$(BIN)/" README.md example/livestatus.toml example/style.css
