@@ -1,6 +1,5 @@
 BIN := waybar-livestatus
-VERSION := 0.0.1
-VERSION ?= $(VERSION)
+VERSION := $(shell git describe --long --tags | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g')
 
 PREFIX ?= /usr
 LIB_DIR = $(DESTDIR)$(PREFIX)/lib
