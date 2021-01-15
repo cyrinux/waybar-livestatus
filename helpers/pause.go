@@ -22,6 +22,6 @@ func PauseHandler() {
 		sig := <-sigs
 		Pause = !Pause // toggle pause
 		log.Infof("signal %v, pause %v", sig, Pause)
-		time.Sleep(5 * time.Second)
+		time.Sleep(1000 * time.Millisecond)
 	}
 }

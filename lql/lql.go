@@ -5,6 +5,7 @@ import (
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	log "github.com/sirupsen/logrus"
 	livestatus "github.com/vbatoufflet/go-livestatus"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -21,31 +22,45 @@ type AlertStruct struct {
 	Count int
 	Items string
 	Class string
+	Error error
 }
 
-func getQuery(objectType string, warnings bool, hostsArray []string) (q *livestatus.Query) {
+func sanitizeObjectType(objectType string) {
+	if !(objectType == "hosts" || objectType == "services") {
+		log.Error("Bad objectType, valid are 'services' or 'hosts'")
+		os.Exit(1)
+	}
+}
+
+func getQuery(objectType string, config helpers.CONFIG) (q *livestatus.Query) {
+
+	sanitizeObjectType(objectType)
+
 	q = livestatus.NewQuery(objectType)
-	q.Columns("host_name", "state", "description")
+	q.Columns("host_name", "state", "description", "notes_url", "is_flapping")
 	q.Filter("is_problem = 1")
 	q.Filter(fmt.Sprintf("state = %v", statusCritical))
-	if warnings {
+	if config.Warnings {
 		q.Filter(fmt.Sprintf("state = %v", statusWarning))
 		q.Or(2)
 	}
-	q.Filter("acknowledged = 0")           // not acknowledged
-	q.Filter("notifications_enabled = 1")  // notifications are enabled
-	q.Filter("in_notification_period = 1") // in notification period
-	q.Filter("scheduled_downtime_depth = 0")
-	scheduleDowntimeDepthFilter := fmt.Sprintf("%s_scheduled_downtime_depth = 0",
-		strings.TrimRight(objectType, "s"))
-	q.Filter(scheduleDowntimeDepthFilter)
-	for _, hostName := range hostsArray {
-		log.Debugf("filter host %s", hostName)
-		filter := fmt.Sprintf("host_name ~ %s", hostName)
-		q.Filter(filter)
+	q.Filter(fmt.Sprintf("acknowledged = %v", int(config.Acknowledged)))
+	q.Filter(fmt.Sprintf("notifications_enabled = %v", int(config.NotificationsEnabled)))
+	q.Filter(fmt.Sprintf("in_notification_period = %v", int(config.InNotificationPeriod)))
+	q.Filter(fmt.Sprintf("scheduled_downtime_depth = %v", int(config.ScheduledDowntimeDepth)))
+	if objectType == "services" {
+		q.Filter(fmt.Sprintf("service_scheduled_downtime_depth = %v", int(config.ServiceScheduledDowntimeDepth)))
+	} else if objectType == "hosts" {
+		q.Filter(fmt.Sprintf("host_scheduled_downtime_depth = %v", int(config.HostScheduledDowntimeDepth)))
 	}
-	countHosts := len(hostsArray)
+
+	countHosts := len(config.HostsPattern)
 	if countHosts > 1 {
+		for _, hostName := range config.HostsPattern {
+			log.Debugf("filter host %s", hostName)
+			hostFilter := fmt.Sprintf("host_name ~ %s", hostName)
+			q.Filter(hostFilter)
+		}
 		q.Or(countHosts)
 	}
 
@@ -54,8 +69,10 @@ func getQuery(objectType string, warnings bool, hostsArray []string) (q *livesta
 
 // GetResponse parse the response from the livestatus client
 // objectType: hosts or services
-func GetResponse(objectType string, c livestatus.Client, q *livestatus.Query, refresh int) (resp *livestatus.Response, localRefresh int, err error) {
-	longRefresh := 60 // backoff refresh value
+func GetResponse(objectType string, c *livestatus.Client, q *livestatus.Query, config *helpers.CONFIG) (resp *livestatus.Response, localRefresh int, err error) {
+
+	sanitizeObjectType(objectType)
+
 	t0 := time.Now()
 	log.Debugf("start of LQL %s query", objectType)
 	resp, err = c.Exec(q)
@@ -72,28 +89,32 @@ func GetResponse(objectType string, c livestatus.Client, q *livestatus.Query, re
 	duration := t1.Sub(t0)
 
 	// if the query is two slow, use backoff
-	if int(duration.Seconds()) >= refresh {
-		localRefresh = longRefresh
+	if int(duration.Seconds()) >= config.Refresh {
+		localRefresh = config.LongRefresh
 		log.Debugf("end of LQL %s query, took %v seconds, too slow, next refresh in %d seconds", objectType, duration.Seconds(), localRefresh)
 	} else {
 		log.Debugf("end of LQL %s query, took %v seconds", objectType, duration.Seconds())
-		localRefresh = refresh
+		localRefresh = config.Refresh
 	}
 
 	return
 }
 
 // GetItems open livestatus connection then query it
-func GetItems(objectType string, server string, warnings, debug bool, channel chan AlertStruct, refresh int, hostPattern string) {
+func GetItems(objectType string, config *helpers.CONFIG, channel chan AlertStruct) {
+
+	sanitizeObjectType(objectType)
+
 	// services alerts
-	c := livestatus.NewClient("tcp", server)
-	defer c.Close()
+	client := livestatus.NewClient("tcp", config.Server)
+	defer client.Close()
 
 	// LQL query
-	hostsArray := strings.Split(hostPattern, ",")
-	query := getQuery(objectType, warnings, hostsArray)
+	query := getQuery(objectType, *config)
 
 	for {
+
+		var class string
 
 		if helpers.Pause {
 			time.Sleep(5 * time.Second)
@@ -101,45 +122,56 @@ func GetItems(objectType string, server string, warnings, debug bool, channel ch
 		}
 
 		// make the LQL requests
-		resp, localRefresh, err := GetResponse(objectType, *c, query, refresh)
-		if err != nil {
-			time.Sleep(10 * time.Second) // backoff
-			continue
-		}
-
+		resp, localRefresh, err := GetResponse(objectType, client, query, config)
+		var alert AlertStruct
 		items := ""
-		class := "ok"
 
-		// get count
-		count := len(resp.Records)
-		for _, r := range resp.Records {
+		if err != nil {
+			class = "error"
+			count := 0
+			alert = AlertStruct{Count: count, Items: items, Class: class, Error: err}
+			time.Sleep(10 * time.Second)
+		} else {
+			class = "ok"
 
-			var item string
+			// get count
+			count := len(resp.Records)
+			for _, r := range resp.Records {
 
-			host, err := r.GetString("host_name")
-			if err != nil {
-				log.Warn(err)
-			}
+				var item string
 
-			state, err := r.GetInt("state")
-			if err != nil {
-				log.Warn(err)
-			}
+				host, err := r.GetString("host_name")
+				if err != nil {
+					log.Warn(err)
+				}
 
-			desc, err := r.GetString("description")
-			if err != nil {
-				log.Warn(err)
-			}
+				state, err := r.GetInt("state")
+				if err != nil {
+					log.Warn(err)
+				}
 
-			// keep the worse state
-			if state == statusCritical {
-				class = "critical"
-			} else if state == statusWarning && class != "critical" {
-				class = "warning"
-			}
+				desc, err := r.GetString("description")
+				if err != nil {
+					log.Warn(err)
+				}
 
-			// flapping handle
-			if objectType == "hosts" {
+				notes_url, err := r.GetString("notes_url")
+				if err != nil {
+					log.Warn(err)
+				} else {
+					if len(notes_url) > 0 {
+						log.Infof("%s: %s: %s", host, desc, notes_url)
+					}
+				}
+
+				// keep the worse state
+				if state == statusCritical {
+					class = "critical"
+				} else if state == statusWarning && class != "critical" {
+					class = "warning"
+				}
+
+				// flapping handle
 				isFlapping, err := r.GetInt("is_flapping")
 				if err != nil {
 					log.Warn(err)
@@ -147,32 +179,30 @@ func GetItems(objectType string, server string, warnings, debug bool, channel ch
 
 				isFlappingStr := strconv.FormatInt(isFlapping, 10)
 				if isFlappingStr == "1" {
-					isFlappingStr = " "
+					isFlappingStr = config.FlappingIcon
 				} else {
 					isFlappingStr = ""
 				}
-				item = host + ": " + class + " " + isFlappingStr + "\n"
-			} else {
-				item = host + ": " + desc + " : " + class + "\n"
+
+				if objectType == "services" {
+					item = fmt.Sprintf("* %s: %s %s %s\n", host, desc, class, isFlappingStr)
+				} else if objectType == "hosts" {
+					item = fmt.Sprintf("* %s: %s %s\n", host, class, isFlappingStr)
+				}
+				items += item
 			}
+			// trim services
+			items = strings.TrimRight(items, "\n")
 
-			items += item
+			// make the alert
+			alert = AlertStruct{Count: count, Items: items, Class: class}
 		}
-
-		// trim services
-		items = strings.TrimRight(items, "\n")
-
-		// make the alert
-		alert := AlertStruct{Count: count, Items: items, Class: class}
 
 		// feed the alerts channel
-		select {
-		case channel <- alert:
-			log.Debugf("sent alerts %+v", alert.Items)
-		default:
-		}
+		log.Debugf("sending %d %s alerts", alert.Count, objectType)
+		channel <- alert
+
 		// main sleep
 		time.Sleep(time.Duration(localRefresh) * time.Second)
-
 	}
 }

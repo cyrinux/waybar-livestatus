@@ -1,3 +1,12 @@
+#custom-prod-status.warning {
+  border-bottom: 3px solid @yellow;
+}
+#custom-prod-status.error {
+  border-bottom: 3px solid @red;
+}
+#custom-prod-status.ok {
+  border-bottom: 3px solid @green;
+}
 #custom-prod-status.pause {
   border-bottom: 3px solid @purple;
 }

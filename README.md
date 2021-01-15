@@ -1,22 +1,28 @@
-# waybar-livestatus
+# Waybar-livestatus
 
 Tiny waybar module to fetch new alerts from livestatus.
 It use the go-livestatus module
 
-# requirements
+# Requirements
 
 - fontsawesome
-- golang
 
-## Usage
+# Installation
 
-You can use a toml config file, see `livestatus.toml.example` or use CLI params.
+- `make && make install`
+- Archlinux: AUR package available https://aur.archlinux.org/packages/waybar-livestatus/
 
-`waybar-livestatus -h`
+# requirements
+
+- otf-font-awesome
 
 ## Configuration
 
 `waybar-livestatus` will search config file in `$HOME/.config/waybar/livestatus.toml`
+
+You can use a toml config file, see `livestatus.toml.example` or use CLI params.
+
+`waybar-livestatus -h`
 
 # waybar config
 
@@ -37,6 +43,16 @@ style.css
 
 ```css
 ...
+
+#custom-prod-status.warning {
+  border-bottom: 3px solid @yellow;
+}
+#custom-prod-status.error {
+  border-bottom: 3px solid @red;
+}
+#custom-prod-status.ok {
+  border-bottom: 3px solid @green;
+}
 #custom-prod-status.pause {
   border-bottom: 3px solid @purple;
 }
@@ -78,6 +94,9 @@ style.css
 ...
 ```
 
-# pause
+# Usage
 
-You can toggle pause of the poller with sending `SIGUSR1`.
+You can toggle pause of the poller with sending `SIGUSR1`. Or clicking on the waybar icon if you use my configuration.
+You will got the lists of alerts on mouse over the icon.
+
+If `popup` are enable you will got a popup if alerts number raise.
