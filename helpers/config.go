@@ -64,11 +64,12 @@ func GetConfig() *CONFIG {
 	config.HostsPatternString = strings.Join(config.HostsPattern, ",")
 
 	// override config values with values from cli
-	flag.StringVar(&config.Server, "s", config.Server, "Livestatus 'server:port'")
-	flag.BoolVar(&config.Warnings, "w", config.Debug, "Get also state warnings.")
+	flag.StringVar(&config.Server, "s", config.Server, "Livestatus 'server:port'.")
+	flag.BoolVar(&config.Warnings, "w", config.Debug, "Get also state warnings. Default show critical only.")
 	flag.BoolVar(&config.Popup, "n", config.Popup, "Disable popup alert.")
 	flag.BoolVar(&config.Debug, "d", config.Debug, "Get debug log.")
 	flag.IntVar(&config.Refresh, "r", config.Refresh, "Refresh rate in seconds. Min 15.")
+	flag.IntVar(&config.LongRefresh, "R", config.Refresh, "Long refresh rate in seconds.")
 	flag.StringVar(&config.HostsPatternString, "H", config.HostsPatternString, "Hostname pattern comma separated.")
 	flag.BoolVar(&config.Version, "V", false, "Print version and exit")
 	flag.Parse() // Parse flags
@@ -80,6 +81,17 @@ func GetConfig() *CONFIG {
 	// set log level
 	if config.Debug {
 		log.SetLevel(log.DebugLevel)
+	}
+
+	// sanitize refresh
+	if config.Refresh < 15 {
+		log.Info("Refresh rate can't be under 15 seconds ! Fallback to default: 30 seconds")
+		config.Refresh = 30
+	}
+
+	if config.LongRefresh < 30 {
+		log.Info("Long refresh rate can't be under 30 seconds ! Fallback to default: 60 seconds")
+		config.LongRefresh = 60
 	}
 
 	return config
