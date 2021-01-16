@@ -83,21 +83,20 @@ func main() {
 		os.Exit(0)
 	}
 
-	if config.Refresh < 15 {
-		log.Info("Refresh rate can't be under 15 seconds ! Fallback to default: 60 seconds")
-		config.Refresh = 60
-	}
-
 	log.Debugf("Refresh rate: %d seconds, long refresh: %d seconds", config.Refresh, config.LongRefresh)
 
 	// create channels and start goroutines
 	hostAlerts := make(chan lql.AlertStruct)
-	go lql.GetItems("hosts", config, hostAlerts)
 	hAlerts := new(lql.AlertStruct)
+	if config.HostsOnly && !config.ServicesOnly || (!config.ServicesOnly && !config.HostsOnly) {
+		go lql.GetItems("hosts", config, hostAlerts)
+	}
 
 	serviceAlerts := make(chan lql.AlertStruct)
-	go lql.GetItems("services", config, serviceAlerts)
 	sAlerts := new(lql.AlertStruct)
+	if (config.ServicesOnly && !config.HostsOnly) || (!config.ServicesOnly && !config.HostsOnly) {
+		go lql.GetItems("services", config, serviceAlerts)
+	}
 
 	// toggle pause on SIGUSR1
 	go helpers.PauseHandler()

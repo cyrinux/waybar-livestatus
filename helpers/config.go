@@ -36,6 +36,8 @@ type CONFIG struct {
 	ErrorPrefix                   string `toml:"error_prefix" default:""`
 	OkPrefix                      string `toml:"ok_prefix" default:""`
 	FlappingIcon                  string `toml:"flapping_icon" default:""`
+	HostsOnly                     bool   `toml:"hosts_only" default:"false"`
+	ServicesOnly                  bool   `toml:"services_only" default:"false"`
 }
 
 // GetConfig merge config from file and flag
@@ -88,10 +90,14 @@ func GetConfig() *CONFIG {
 		log.Info("Refresh rate can't be under 15 seconds ! Fallback to default: 30 seconds")
 		config.Refresh = 30
 	}
-
 	if config.LongRefresh < 30 {
 		log.Info("Long refresh rate can't be under 30 seconds ! Fallback to default: 60 seconds")
 		config.LongRefresh = 60
+	}
+	if config.ServicesOnly && config.HostsOnly {
+		log.Error("services_only and hosts_only can't be set together")
+		config.HostsOnly = false
+		config.ServicesOnly = false
 	}
 
 	return config
