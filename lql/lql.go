@@ -5,7 +5,6 @@ import (
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	log "github.com/sirupsen/logrus"
 	livestatus "github.com/vbatoufflet/go-livestatus"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -27,8 +26,7 @@ type AlertStruct struct {
 
 func sanitizeObjectType(objectType string) {
 	if !(objectType == "hosts" || objectType == "services") {
-		log.Error("Bad objectType, valid are 'services' or 'hosts'")
-		os.Exit(1)
+		log.Fatal("Bad objectType, valid are 'services' or 'hosts'")
 	}
 }
 
