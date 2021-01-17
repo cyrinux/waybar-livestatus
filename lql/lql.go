@@ -33,9 +33,12 @@ func sanitizeObjectType(objectType string) {
 func getQuery(objectType string, config helpers.CONFIG) (q *livestatus.Query) {
 
 	sanitizeObjectType(objectType)
-
 	q = livestatus.NewQuery(objectType)
-	q.Columns("host_name", "state", "description", "notes_url", "is_flapping")
+	columns := "\"host_name\", \"state\", \"description\", \"is_flapping\""
+	if config.NotesURL {
+		columns += ", \"notes_url\""
+	}
+	q.Columns(columns)
 	q.Filter("is_problem = 1")
 	q.Filter(fmt.Sprintf("state = %v", statusCritical))
 	if config.Warnings {
@@ -55,7 +58,7 @@ func getQuery(objectType string, config helpers.CONFIG) (q *livestatus.Query) {
 	countHosts := len(config.HostsPattern)
 	if countHosts > 1 {
 		for _, hostName := range config.HostsPattern {
-			log.Debugf("filter host %s", hostName)
+			log.Debugf("filter host_name ~ '%s'", hostName)
 			hostFilter := fmt.Sprintf("host_name ~ %s", hostName)
 			q.Filter(hostFilter)
 		}
@@ -68,10 +71,9 @@ func getQuery(objectType string, config helpers.CONFIG) (q *livestatus.Query) {
 // GetResponse parse the response from the livestatus client
 // objectType: hosts or services
 func GetResponse(objectType string, c *livestatus.Client, q *livestatus.Query, config *helpers.CONFIG) (resp *livestatus.Response, localRefresh int, err error) {
-
 	sanitizeObjectType(objectType)
 
-	t0 := time.Now()
+	startTime := time.Now()
 	log.Debugf("start of LQL %s query", objectType)
 	resp, err = c.Exec(q)
 	if err != nil {
@@ -83,16 +85,18 @@ func GetResponse(objectType string, c *livestatus.Client, q *livestatus.Query, c
 		return
 	}
 
-	t1 := time.Now()
-	duration := t1.Sub(t0)
+	endTime := time.Now()
+	duration := endTime.Sub(startTime)
 
 	// if the query is two slow, use backoff
 	if int(duration.Seconds()) >= config.Refresh {
 		localRefresh = config.LongRefresh
-		log.Debugf("end of LQL %s query, took %v seconds, too slow, next refresh in %d seconds", objectType, duration.Seconds(), localRefresh)
+		log.Debugf("end of LQL %s query, took %v seconds, too slow, next refresh in %d seconds",
+			objectType, duration.Seconds(), localRefresh)
 	} else {
-		log.Debugf("end of LQL %s query, took %v seconds", objectType, duration.Seconds())
 		localRefresh = config.Refresh
+		log.Debugf("end of LQL %s query, took %v seconds",
+			objectType, duration.Seconds())
 	}
 
 	return
@@ -153,12 +157,14 @@ func GetItems(objectType string, config *helpers.CONFIG, channel chan AlertStruc
 					log.Warn(err)
 				}
 
-				notes_url, err := r.GetString("notes_url")
-				if err != nil {
-					log.Warn(err)
-				} else {
-					if len(notes_url) > 0 {
-						log.Infof("%s: %s: %s", host, desc, notes_url)
+				if config.NotesURL {
+					notesURL, err := r.GetString("notes_url")
+					if err != nil {
+						log.Warn(err)
+					} else {
+						if len(notesURL) > 0 {
+							log.Infof("%s: %s: %s", host, desc, notesURL)
+						}
 					}
 				}
 

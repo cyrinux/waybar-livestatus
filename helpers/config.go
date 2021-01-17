@@ -38,6 +38,7 @@ type CONFIG struct {
 	FlappingIcon                  string `toml:"flapping_icon" default:""`
 	HostsOnly                     bool   `toml:"hosts_only" default:"false"`
 	ServicesOnly                  bool   `toml:"services_only" default:"false"`
+	NotesURL                      bool   `toml:"notes_url" default:"false"`
 }
 
 // GetConfig merge config from file and flag
