@@ -4,3 +4,5 @@ hosts_pattern = [".prod.", ".dev.", ".staging."]
 popup = true
 warnings = true
 debug = false
+get_duration = false
+limit = 0

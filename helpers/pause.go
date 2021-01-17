@@ -1,16 +1,33 @@
 package helpers
 
 import (
+	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Pause state
 var Pause = false
+
+// SetPause pause the polling
+func SetPause() {
+	log.Info("Pause polling")
+	Pause = true
+	runtime.GC()
+}
+
+// SetResume resume from pause
+func SetResume() {
+	log.Info("Start polling")
+	Pause = false
+}
+
+func togglePause() {
+	Pause = !Pause
+}
 
 // PauseHandler handle the SIGUSR1 to pause the app
 func PauseHandler() {
@@ -20,8 +37,8 @@ func PauseHandler() {
 
 	for {
 		sig := <-sigs
-		Pause = !Pause // toggle pause
+		togglePause()
 		log.Infof("signal %v, pause %v", sig, Pause)
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 	}
 }

@@ -21,7 +21,9 @@ run: local
 
 .PHONY: build
 build: main.go helpers/ lql/
-	go build -ldflags "-X main.version=$(VERSION) -linkmode=external" -o $(BIN) main.go
+	go build -trimpath -ldflags "-X main.version=$(VERSION) -linkmode=external" -o $(BIN) main.go
+	# strip $(BIN) 2>/dev/null || true
+	# upx -9 $(BIN) 2>/dev/null || true
 
 .PHONY: vendor
 vendor:

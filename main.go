@@ -13,14 +13,7 @@ import (
 
 var version string
 
-type waybarOutput struct {
-	Text    string `json:"text"`
-	Tooltip string `json:"tooltip"`
-	Class   string `json:"class"`
-	Count   int    `json:"count"`
-}
-
-func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *helpers.CONFIG) (wOutput waybarOutput) {
+func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *helpers.CONFIG) (wOutput helpers.WaybarOutput) {
 
 	// format
 	globalClass := "ok"
@@ -30,7 +23,7 @@ func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *help
 	// test and format
 	var hostAlertsCount = int(hAlerts.Count)
 	if hostAlertsCount > 0 {
-		icon = " " + config.HostPrefix + " "
+		icon = config.HostPrefix + " "
 		text += fmt.Sprintf("%s %d", icon, hAlerts.Count)
 		tooltip += fmt.Sprintf("<b>Hosts: %d</b>\n\n%s", hAlerts.Count, hAlerts.Items)
 		globalClass = hAlerts.Class
@@ -46,7 +39,7 @@ func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *help
 		if len(text) > 0 {
 			text += " | "
 		}
-		icon = " " + config.ServicePrefix + " "
+		icon = config.ServicePrefix + " "
 		text += fmt.Sprintf("%s %d", icon, sAlerts.Count)
 		globalClass += sAlerts.Class
 	}
@@ -68,7 +61,7 @@ func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *help
 	text = strings.TrimRight(text, "\n")
 
 	// waybar output
-	wOutput = waybarOutput{Text: text, Tooltip: tooltip, Class: globalClass, Count: hostAlertsCount + serviceAlertsCount}
+	wOutput = helpers.WaybarOutput{Text: text, Tooltip: tooltip, Class: globalClass, Count: hostAlertsCount + serviceAlertsCount}
 
 	return
 }
@@ -78,6 +71,8 @@ func main() {
 	// get config
 	var config = helpers.GetConfig()
 
+	helpers.AutoPause(config)
+
 	if config.Version {
 		fmt.Println("Waybar Livestatus version:", version)
 		os.Exit(0)
@@ -86,23 +81,26 @@ func main() {
 	log.Debugf("Refresh rate: %d seconds, long refresh: %d seconds", config.Refresh, config.LongRefresh)
 
 	// create channels and start goroutines
-	hostAlerts := make(chan lql.AlertStruct)
-	hAlerts := new(lql.AlertStruct)
-	if config.HostsOnly && !config.ServicesOnly || (!config.ServicesOnly && !config.HostsOnly) {
-		go lql.GetItems("hosts", config, hostAlerts)
-	}
+	hostAlerts, serviceAlerts, notificationsChannel := make(chan lql.AlertStruct), make(chan lql.AlertStruct), make(chan *helpers.Alert, 10)
+	hAlerts, sAlerts := new(lql.AlertStruct), new(lql.AlertStruct)
 
-	serviceAlerts := make(chan lql.AlertStruct)
-	sAlerts := new(lql.AlertStruct)
+	if config.HostsOnly && !config.ServicesOnly || (!config.ServicesOnly && !config.HostsOnly) {
+		go lql.GetItems("hosts", config, hostAlerts, notificationsChannel)
+	}
 	if (config.ServicesOnly && !config.HostsOnly) || (!config.ServicesOnly && !config.HostsOnly) {
-		go lql.GetItems("services", config, serviceAlerts)
+		go lql.GetItems("services", config, serviceAlerts, notificationsChannel)
 	}
 
 	// toggle pause on SIGUSR1
 	go helpers.PauseHandler()
 
+	// notification channel
+	if config.Popup {
+		go helpers.SendNotification(notificationsChannel, config)
+	}
+
 	// keep version of previous output
-	var wOutput, previousWOutput waybarOutput
+	var wOutput, previousWOutput helpers.WaybarOutput
 
 	// main loop
 	for {
@@ -114,7 +112,6 @@ func main() {
 		default:
 			// nothing receive, sleep a little
 			time.Sleep(500 * time.Millisecond)
-			continue
 		}
 
 		// save previous waybar output
@@ -139,13 +136,6 @@ func main() {
 		// Finally print the expected waybar JSON
 		if wOutput != previousWOutput {
 			fmt.Println(string(jsonOutput))
-		}
-
-		// popup notification
-		if config.Popup && !helpers.Pause && wOutput != previousWOutput && wOutput.Class != "ok" && wOutput.Class != "error" && wOutput.Count > previousWOutput.Count {
-			if popup, err := helpers.SendNotification(fmt.Sprintf("Hero, check the %d alerts", wOutput.Count), wOutput.Text, ""); err != nil {
-				log.Errorf("Error sending notification: %v", popup)
-			}
 		}
 	}
 }

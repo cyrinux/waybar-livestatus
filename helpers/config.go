@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/user"
 	"strings"
@@ -15,7 +16,7 @@ import (
 
 // CONFIG define the configuration content
 type CONFIG struct {
-	Server                        string
+	Server                        string   `toml:"server" default:""`
 	Refresh                       int      `toml:"refresh" default:"30"`
 	LongRefresh                   int      `toml:"long_refresh" default:"60"`
 	HostsPattern                  []string `toml:"hosts_pattern"`
@@ -38,6 +39,13 @@ type CONFIG struct {
 	FlappingIcon                  string `toml:"flapping_icon" default:""`
 	HostsOnly                     bool   `toml:"hosts_only" default:"false"`
 	ServicesOnly                  bool   `toml:"services_only" default:"false"`
+	NotesURL                      bool   `toml:"notes_url" default:"false"`
+	Limit                         int    `toml:"limit" default:"0"`
+	GetDuration                   bool   `toml:"get_duration" default:"false"`
+	// eg: 0 9 * * *
+	AutoStart string `toml:"auto_start" default:""`
+	// eg: 0 22 * * *
+	AutoStop string `toml:"auto_stop" default:""`
 }
 
 // GetConfig merge config from file and flag
@@ -76,14 +84,23 @@ func GetConfig() *CONFIG {
 	flag.BoolVar(&config.Version, "V", false, "Print version and exit")
 	flag.Parse() // Parse flags
 
+	// if not server exit
 	if config.Server == "" {
 		fmt.Fprintf(os.Stderr, "The server can't be empty!")
 		os.Exit(1)
 	}
+	// if string without port add it
+	if _, _, err := net.SplitHostPort(config.Server); err != nil {
+		config.Server += ":50000"
+	}
+
 	// set log level
 	if config.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
+
+	// sanitize server
+	config.Server = strings.TrimSpace(config.Server)
 
 	// sanitize refresh
 	if config.Refresh < 15 {

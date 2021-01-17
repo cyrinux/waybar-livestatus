@@ -35,7 +35,15 @@ func getQuery(objectType string, config helpers.CONFIG) (q *livestatus.Query) {
 	sanitizeObjectType(objectType)
 
 	q = livestatus.NewQuery(objectType)
-	q.Columns("host_name", "state", "description", "notes_url", "is_flapping")
+	columns := []string{"host_name", "state", "description", "is_flapping"}
+	if config.NotesURL {
+		columns = append(columns, "notes_url")
+	}
+	if config.GetDuration {
+		columns = append(columns, "last_hard_state_change")
+	}
+	q.Columns(columns...)
+
 	q.Filter("is_problem = 1")
 	q.Filter(fmt.Sprintf("state = %v", statusCritical))
 	if config.Warnings {
@@ -55,23 +63,28 @@ func getQuery(objectType string, config helpers.CONFIG) (q *livestatus.Query) {
 	countHosts := len(config.HostsPattern)
 	if countHosts > 1 {
 		for _, hostName := range config.HostsPattern {
-			log.Debugf("filter host %s", hostName)
+			log.Debugf("filter host_name ~ '%s'", hostName)
 			hostFilter := fmt.Sprintf("host_name ~ %s", hostName)
 			q.Filter(hostFilter)
 		}
 		q.Or(countHosts)
 	}
+	q.Limit(config.Limit)
+
+	if config.Debug {
+		log.Debug(q)
+	}
 
 	return
 }
 
-// GetResponse parse the response from the livestatus client
+// getResponse parse the response from the livestatus client
 // objectType: hosts or services
-func GetResponse(objectType string, c *livestatus.Client, q *livestatus.Query, config *helpers.CONFIG) (resp *livestatus.Response, localRefresh int, err error) {
+func getResponse(objectType string, c *livestatus.Client, q *livestatus.Query, config *helpers.CONFIG) (resp *livestatus.Response, localRefresh int, err error) {
 
 	sanitizeObjectType(objectType)
 
-	t0 := time.Now()
+	startTime := time.Now()
 	log.Debugf("start of LQL %s query", objectType)
 	resp, err = c.Exec(q)
 	if err != nil {
@@ -83,24 +96,24 @@ func GetResponse(objectType string, c *livestatus.Client, q *livestatus.Query, c
 		return
 	}
 
-	t1 := time.Now()
-	duration := t1.Sub(t0)
-
+	endTime := time.Now()
+	duration := endTime.Sub(startTime)
 	// if the query is two slow, use backoff
 	if int(duration.Seconds()) >= config.Refresh {
 		localRefresh = config.LongRefresh
-		log.Debugf("end of LQL %s query, took %v seconds, too slow, next refresh in %d seconds", objectType, duration.Seconds(), localRefresh)
+		log.Debugf("end of LQL %s query, took %v seconds, too slow, next refresh in %d seconds",
+			objectType, duration.Seconds(), localRefresh)
 	} else {
-		log.Debugf("end of LQL %s query, took %v seconds", objectType, duration.Seconds())
 		localRefresh = config.Refresh
+		log.Debugf("end of LQL %s query, took %v seconds",
+			objectType, duration.Seconds())
 	}
 
 	return
 }
 
 // GetItems open livestatus connection then query it
-func GetItems(objectType string, config *helpers.CONFIG, channel chan AlertStruct) {
-
+func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan AlertStruct, notificationsChannel chan *helpers.Alert) {
 	sanitizeObjectType(objectType)
 
 	// services alerts
@@ -111,17 +124,19 @@ func GetItems(objectType string, config *helpers.CONFIG, channel chan AlertStruc
 	query := getQuery(objectType, *config)
 
 	for {
-
 		var class string
+		now := time.Now()
+		var lastHardStateChangeDuration time.Duration
 
 		if helpers.Pause {
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		// make the LQL requests
-		resp, localRefresh, err := GetResponse(objectType, client, query, config)
+		resp, localRefresh, err := getResponse(objectType, client, query, config)
+
 		var alert AlertStruct
+
 		items := ""
 
 		if err != nil {
@@ -135,8 +150,15 @@ func GetItems(objectType string, config *helpers.CONFIG, channel chan AlertStruc
 			// get count
 			count := len(resp.Records)
 			for _, r := range resp.Records {
-
 				var item string
+
+				if config.GetDuration {
+					lastHardStateChange, err := r.GetTime("last_hard_state_change")
+					if err != nil {
+						log.Warn(err)
+					}
+					lastHardStateChangeDuration = now.Sub(lastHardStateChange)
+				}
 
 				host, err := r.GetString("host_name")
 				if err != nil {
@@ -151,15 +173,6 @@ func GetItems(objectType string, config *helpers.CONFIG, channel chan AlertStruc
 				desc, err := r.GetString("description")
 				if err != nil {
 					log.Warn(err)
-				}
-
-				notes_url, err := r.GetString("notes_url")
-				if err != nil {
-					log.Warn(err)
-				} else {
-					if len(notes_url) > 0 {
-						log.Infof("%s: %s: %s", host, desc, notes_url)
-					}
 				}
 
 				// keep the worse state
@@ -182,13 +195,35 @@ func GetItems(objectType string, config *helpers.CONFIG, channel chan AlertStruc
 					isFlappingStr = ""
 				}
 
+				if config.NotesURL {
+					notesURL, err := r.GetString("notes_url")
+					if err != nil {
+						log.Warn(err)
+					} else {
+						if len(notesURL) > 0 {
+							log.Infof("%s: %s: %s", host, desc, notesURL)
+						}
+					}
+				}
+
 				if objectType == "services" {
 					item = fmt.Sprintf("* %s: %s %s %s\n", host, desc, class, isFlappingStr)
 				} else if objectType == "hosts" {
 					item = fmt.Sprintf("* %s: %s %s\n", host, class, isFlappingStr)
 				}
+
+				if config.GetDuration {
+					item += fmt.Sprintf("  since %s\n", lastHardStateChangeDuration.Round(1*time.Second))
+				}
+
+				// notifications
+				notification := helpers.Alert{Host: host, Desc: desc, Class: class}
+				notificationsChannel <- &notification
+
 				items += item
+
 			}
+
 			// trim services
 			items = strings.TrimRight(items, "\n")
 
@@ -198,7 +233,8 @@ func GetItems(objectType string, config *helpers.CONFIG, channel chan AlertStruc
 
 		// feed the alerts channel
 		log.Debugf("sending %d %s alerts", alert.Count, objectType)
-		channel <- alert
+
+		alertChannel <- alert
 
 		// main sleep
 		time.Sleep(time.Duration(localRefresh) * time.Second)
