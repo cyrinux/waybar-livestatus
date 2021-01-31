@@ -1,28 +1,30 @@
 package helpers
 
 import (
+	"fmt"
 	notifier "github.com/blakek/go-notifier"
 	log "github.com/sirupsen/logrus"
 )
 
 // Alert define a event
 type Alert struct {
-	Host  string
-	Desc  string
-	Class string
+	Host     string
+	Desc     string
+	Class    string
+	NotesURL string
 }
 
-func notify(title, message, icon string) (popup *notifier.Notification, err error) {
+func notify(title, message, icon string) (notification *notifier.Notification, err error) {
 	if icon == "" {
 		icon = "/usr/share/icons/Adwaita/32x32/legacy/dialog-warning.png"
 	}
-	popup = &notifier.Notification{Title: title, Message: message, ImagePath: icon}
+	notification = &notifier.Notification{Title: title, Message: message, ImagePath: icon}
 	notifier, err := notifier.NewNotifier()
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	if err := notifier.DeliverNotification(*popup); err != nil {
+	if err := notifier.DeliverNotification(*notification); err != nil {
 		log.Error(err)
 	}
 	return
@@ -31,25 +33,24 @@ func notify(title, message, icon string) (popup *notifier.Notification, err erro
 // SendNotification send a notification
 func SendNotification(notifications chan *Alert, config *CONFIG) {
 
-	alertsWithCounter := make(map[Alert]int, 20)
+	alertsWithCounter := make(map[Alert]int)
 
 	if config.Debug {
-		if popup, err := notify("Livestatus", "starting", ""); err != nil {
-			log.Errorf("Error sending notification: %v", popup)
+		if notification, err := notify("Livestatus", fmt.Sprintf("starting version %v", Version), ""); err != nil {
+			log.Errorf("Error sending notification: %v", notification)
 		}
 	}
 
 	for {
 		notification := <-notifications
 
-		// // check if notification not null
+		// check if notification not null
 		if notification == nil {
 			continue
 		}
 
 		// check if notification was already sent, and polled 10 times
-		if alertsWithCounter[*notification] > 10 {
-			// if polled > 10 times, then delete to be able to resent the notification
+		if alertsWithCounter[*notification] > config.NotificationSnoozeCycle {
 			delete(alertsWithCounter, *notification)
 		}
 
@@ -58,15 +59,13 @@ func SendNotification(notifications chan *Alert, config *CONFIG) {
 		}
 
 		if alertsWithCounter[*notification] == 0 {
-			if popup, err := notify(notification.Host, notification.Desc, ""); err != nil {
-				log.Errorf("Error sending notification: %v", popup)
+			if notification, err := notify(notification.Host, notification.Desc, ""); err != nil {
+				log.Errorf("Error sending notification: %v", notification)
 			}
 		}
 
 		alertsWithCounter[*notification]++
 
-		if config.Debug {
-			log.Debugf("%+v sent %d times", notification, alertsWithCounter[*notification])
-		}
+		log.Debugf("%v sent %d times", notification, alertsWithCounter[*notification])
 	}
 }

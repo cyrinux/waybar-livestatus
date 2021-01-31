@@ -96,7 +96,17 @@ style.css
 
 # Usage
 
+## Daemon
+
 You can toggle pause of the poller with sending `SIGUSR1`. Or clicking on the waybar icon if you use my configuration.
 You will got the lists of alerts on mouse over the icon.
 
 If `popup` are enable you will got a popup if alerts number raise.
+
+## Client
+
+Client mode was mainly done to be integrated with `dmenu`.
+
+There is a client mode `waybar-livestatus -c`.
+Without params this will display the list of alerts.
+You can then pass `host` and `service` as params to get the notes_url.

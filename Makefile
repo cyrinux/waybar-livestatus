@@ -20,10 +20,13 @@ run: local
 	go run main.go
 
 .PHONY: build
-build: main.go helpers/ lql/
-	go build -trimpath -ldflags "-X main.version=$(VERSION) -linkmode=external" -o $(BIN) main.go
-	# strip $(BIN) 2>/dev/null || true
-	# upx -9 $(BIN) 2>/dev/null || true
+build: main.go
+	go build -trimpath -ldflags "-X github.com/cyrinux/waybar-livestatus/helpers.Version=$(VERSION) -linkmode=external" -o $(BIN) main.go
+
+.PHONY: release
+release: build
+	strip $(BIN) 2>/dev/null || true
+	upx -9 $(BIN) 2>/dev/null || true
 
 .PHONY: vendor
 vendor:

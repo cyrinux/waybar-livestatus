@@ -30,15 +30,12 @@ func sanitizeObjectType(objectType string) {
 	}
 }
 
-func getQuery(objectType string, config helpers.CONFIG) (q *livestatus.Query) {
+func getQuery(objectType string, config *helpers.CONFIG) (q *livestatus.Query) {
 
 	sanitizeObjectType(objectType)
 
 	q = livestatus.NewQuery(objectType)
-	columns := []string{"host_name", "state", "description", "is_flapping"}
-	if config.NotesURL {
-		columns = append(columns, "notes_url")
-	}
+	columns := []string{"host_name", "state", "description", "is_flapping", "notes_url"}
 	if config.GetDuration {
 		columns = append(columns, "last_hard_state_change")
 	}
@@ -71,9 +68,7 @@ func getQuery(objectType string, config helpers.CONFIG) (q *livestatus.Query) {
 	}
 	q.Limit(config.Limit)
 
-	if config.Debug {
-		log.Debug(q)
-	}
+	log.Debug(q)
 
 	return
 }
@@ -113,7 +108,7 @@ func getResponse(objectType string, c *livestatus.Client, q *livestatus.Query, c
 }
 
 // GetItems open livestatus connection then query it
-func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan AlertStruct, notificationsChannel chan *helpers.Alert) {
+func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan AlertStruct, notificationsChannel chan *helpers.Alert, serverChannel chan []*helpers.Alert) {
 	sanitizeObjectType(objectType)
 
 	// services alerts
@@ -121,7 +116,7 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 	defer client.Close()
 
 	// LQL query
-	query := getQuery(objectType, *config)
+	query := getQuery(objectType, config)
 
 	for {
 		var class string
@@ -136,8 +131,8 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 		resp, localRefresh, err := getResponse(objectType, client, query, config)
 
 		var alert AlertStruct
-
-		items := ""
+		var items string
+		var itemsMenu []*helpers.Alert
 
 		if err != nil {
 			class = "error"
@@ -195,14 +190,12 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 					isFlappingStr = ""
 				}
 
-				if config.NotesURL {
-					notesURL, err := r.GetString("notes_url")
-					if err != nil {
-						log.Warn(err)
-					} else {
-						if len(notesURL) > 0 {
-							log.Infof("%s: %s: %s", host, desc, notesURL)
-						}
+				notesURL, err := r.GetString("notes_url")
+				if err != nil {
+					log.Warn(err)
+				} else {
+					if len(notesURL) > 0 {
+						log.Infof("%s: %s: %s", host, desc, notesURL)
 					}
 				}
 
@@ -217,10 +210,11 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 				}
 
 				// notifications
-				notification := helpers.Alert{Host: host, Desc: desc, Class: class}
-				notificationsChannel <- &notification
+				notificationsChannel <- &helpers.Alert{Host: host, Desc: desc, Class: class, NotesURL: notesURL}
 
 				items += item
+
+				itemsMenu = append(itemsMenu, &helpers.Alert{Host: host, Desc: desc, Class: class, NotesURL: notesURL})
 
 			}
 
@@ -229,6 +223,8 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 
 			// make the alert
 			alert = AlertStruct{Count: count, Items: items, Class: class}
+
+			serverChannel <- itemsMenu
 		}
 
 		// feed the alerts channel

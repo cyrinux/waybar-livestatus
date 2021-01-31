@@ -10,9 +10,11 @@ import (
 	"strings"
 
 	toml "github.com/pelletier/go-toml"
-
 	log "github.com/sirupsen/logrus"
 )
+
+// Version give the software version
+var Version string
 
 // CONFIG define the configuration content
 type CONFIG struct {
@@ -21,10 +23,12 @@ type CONFIG struct {
 	LongRefresh                   int      `toml:"long_refresh" default:"60"`
 	HostsPattern                  []string `toml:"hosts_pattern"`
 	HostsPatternString            string
+	Client                        bool   `default:"false"`
 	Debug                         bool   `toml:"debug" default:"false"`
 	Popup                         bool   `toml:"popup" default:"true"`
 	Warnings                      bool   `toml:"warnings" default:"true"`
 	Version                       bool   `default:"false"`
+	NotificationSnoozeCycle       int    `toml:"notification_snooze_cycle" default:"10"`
 	Acknowledged                  int    `toml:"acknowledged" default:"0"`
 	NotificationsEnabled          int    `toml:"notifications_enabled" default:"1"`
 	InNotificationPeriod          int    `toml:"in_notification_period" default:"1"`
@@ -51,7 +55,6 @@ type CONFIG struct {
 // GetConfig merge config from file and flag
 // and return `config`
 func GetConfig() *CONFIG {
-
 	config := &CONFIG{}
 	// set log formatter
 	log.SetFormatter(&log.JSONFormatter{})
@@ -72,16 +75,25 @@ func GetConfig() *CONFIG {
 	}
 	fmt.Fprintf(os.Stderr, "Config file loaded: %s\n", configFile)
 	config.HostsPatternString = strings.Join(config.HostsPattern, ",")
+	// check if 'client' not define in the toml config
+	if config.Client {
+		log.Fatal("You are not allowed to define 'client' mode in the config file!")
+	}
 
 	// override config values with values from cli
-	flag.StringVar(&config.Server, "s", config.Server, "Livestatus 'server:port'.")
-	flag.BoolVar(&config.Warnings, "w", config.Debug, "Get also state warnings. Default show critical only.")
-	flag.BoolVar(&config.Popup, "n", config.Popup, "Disable popup alert.")
-	flag.BoolVar(&config.Debug, "d", config.Debug, "Get debug log.")
+
+	flag.BoolVar(&config.Debug, "d", config.Debug, "Debug mode.")
+	flag.BoolVar(&config.Client, "c", false, "Client mode.")
+	flag.BoolVar(&config.NotesURL, "u", config.NotesURL, "Display notes_url.")
+	flag.BoolVar(&config.Popup, "n", config.Popup, "Disable notification popup alert.")
+	flag.BoolVar(&config.Version, "V", false, "Print version and exit.")
+	flag.BoolVar(&config.Warnings, "w", config.Warnings, "Get also state warnings. Default show critical only.")
+
 	flag.IntVar(&config.Refresh, "r", config.Refresh, "Refresh rate in seconds. Min 15.")
-	flag.IntVar(&config.LongRefresh, "R", config.Refresh, "Long refresh rate in seconds.")
+	flag.IntVar(&config.LongRefresh, "R", config.LongRefresh, "Long refresh rate in seconds.")
+	flag.IntVar(&config.NotificationSnoozeCycle, "N", config.NotificationSnoozeCycle, "Notifications snooze cycle.")
+	flag.StringVar(&config.Server, "s", config.Server, "Livestatus 'server:port'.")
 	flag.StringVar(&config.HostsPatternString, "H", config.HostsPatternString, "Hostname pattern comma separated.")
-	flag.BoolVar(&config.Version, "V", false, "Print version and exit")
 	flag.Parse() // Parse flags
 
 	// if not server exit
@@ -110,6 +122,9 @@ func GetConfig() *CONFIG {
 	if config.LongRefresh < 30 {
 		log.Info("Long refresh rate can't be under 30 seconds ! Fallback to default: 60 seconds")
 		config.LongRefresh = 60
+	}
+	if config.NotificationSnoozeCycle < 0 {
+		config.NotificationSnoozeCycle = 10
 	}
 	if config.ServicesOnly && config.HostsOnly {
 		log.Error("services_only and hosts_only can't be set together")

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+option go_package = "github.com/cyrinux/waybar-livestatus/alert";
+
+package alert;
+
+message RequestAlert {
+    string Host = 1;
+    string Service = 2;
+}
+
+message ResponseAlert {
+    string Host = 1;
+    string Service = 2;
+    string NotesUrl = 3;
+}
+
+message ResponseAlertsList {
+    string List = 1;
+}
+
+
+service Alert {
+    rpc GetNotesURL(RequestAlert) returns (ResponseAlert) {}
+    rpc GetAlertsList(RequestAlert) returns (ResponseAlertsList) {}
+}

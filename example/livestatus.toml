@@ -6,3 +6,7 @@ warnings = true
 debug = false
 get_duration = false
 limit = 0
+# notes_url = true
+# notification_snooze_cycle = 20
+# auto_stop = "* 12-15 * * *"
+# auto_start = "* 15-19 * * *"

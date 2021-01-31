@@ -3,15 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cyrinux/waybar-livestatus/client"
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	"github.com/cyrinux/waybar-livestatus/lql"
+	"github.com/cyrinux/waybar-livestatus/server"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"strings"
 	"time"
 )
-
-var version string
 
 func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *helpers.CONFIG) (wOutput helpers.WaybarOutput) {
 
@@ -71,28 +71,38 @@ func main() {
 	// get config
 	var config = helpers.GetConfig()
 
-	helpers.AutoPause(config)
-
 	if config.Version {
-		fmt.Println("Waybar Livestatus version:", version)
+		fmt.Println("Waybar Livestatus version:", helpers.Version)
 		os.Exit(0)
 	}
 
-	log.Debugf("Refresh rate: %d seconds, long refresh: %d seconds", config.Refresh, config.LongRefresh)
+	// start the client and exit
+	if config.Client {
+		err := client.Start(config)
+		if err != nil {
+			log.Error(err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	// start cron based auto-pause system
+	helpers.AutoPause(config)
 
 	// create channels and start goroutines
-	hostAlerts, serviceAlerts, notificationsChannel := make(chan lql.AlertStruct), make(chan lql.AlertStruct), make(chan *helpers.Alert, 10)
+	hostAlerts, serviceAlerts := make(chan lql.AlertStruct), make(chan lql.AlertStruct)
+	notificationsChannel, serverChannel := make(chan *helpers.Alert, 10), make(chan []*helpers.Alert)
 	hAlerts, sAlerts := new(lql.AlertStruct), new(lql.AlertStruct)
 
 	if config.HostsOnly && !config.ServicesOnly || (!config.ServicesOnly && !config.HostsOnly) {
-		go lql.GetItems("hosts", config, hostAlerts, notificationsChannel)
+		go lql.GetItems("hosts", config, hostAlerts, notificationsChannel, serverChannel)
 	}
 	if (config.ServicesOnly && !config.HostsOnly) || (!config.ServicesOnly && !config.HostsOnly) {
-		go lql.GetItems("services", config, serviceAlerts, notificationsChannel)
+		go lql.GetItems("services", config, serviceAlerts, notificationsChannel, serverChannel)
 	}
 
-	// toggle pause on SIGUSR1
-	go helpers.PauseHandler()
+	// Handle Signal
+	go helpers.SignalHandler()
 
 	// notification channel
 	if config.Popup {
@@ -102,6 +112,10 @@ func main() {
 	// keep version of previous output
 	var wOutput, previousWOutput helpers.WaybarOutput
 
+	// Start gRPC server
+	go server.GRPCListen(serverChannel, config)
+
+	log.Debugf("Refresh rate: %d seconds, long refresh: %d seconds", config.Refresh, config.LongRefresh)
 	// main loop
 	for {
 		select {
