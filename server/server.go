@@ -19,15 +19,10 @@ func GRPCListen(alertsChan chan []*helpers.Alert, config *helpers.CONFIG) {
 	}()
 	sock := os.Getenv("XDG_RUNTIME_DIR") + "/waybar-livestatus.sock"
 	lis, err := net.Listen("unix", sock)
-
-	defer func() {
-		lis.Close()
-		os.Remove(sock)
-	}()
-
 	if err != nil {
 		log.Fatalf("Failed to listen on unix socket: %v", err)
 	}
+	defer lis.Close()
 	as := alert.Server{Config: config}
 
 	gs := grpc.NewServer()
@@ -36,7 +31,6 @@ func GRPCListen(alertsChan chan []*helpers.Alert, config *helpers.CONFIG) {
 	reflection.Register(gs)
 
 	alert.RegisterAlertServer(gs, &as)
-
 	if err := gs.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve gRPC over unix socket: %v", err)
 	}

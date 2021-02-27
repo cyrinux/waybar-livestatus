@@ -73,7 +73,7 @@ func GetConfig() *CONFIG {
 	if err != nil {
 		log.Error(err)
 	}
-	fmt.Fprintf(os.Stderr, "Config file loaded: %s\n", configFile)
+	// fmt.Fprintf(os.Stderr, "Config file loaded: %s\n", configFile)
 	config.HostsPatternString = strings.Join(config.HostsPattern, ",")
 	// check if 'client' not define in the toml config
 	if config.Client {

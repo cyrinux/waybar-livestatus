@@ -51,7 +51,11 @@ func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *help
 
 	// on error
 	if hAlerts.Error != nil || sAlerts.Error != nil {
-		icon = " " + config.ErrorPrefix + " "
+		icon = ""
+		if config.ErrorPrefix != "" {
+			icon = " " + config.ErrorPrefix + " "
+		}
+		icon = ""
 		text = icon
 		tooltip = "Can't connect to the livestatus server"
 		globalClass = "error"

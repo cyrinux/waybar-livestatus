@@ -66,7 +66,7 @@ staticcheck: ## Verifies `staticcheck` passes
 	fi
 
 .PHONY: dist
-dist: clean vendor build
+dist: clean vendor build release
 	$(eval TMP := $(shell mktemp -d))
 	mkdir "$(TMP)/$(BIN)-$(VERSION)"
 	cp -r * "$(TMP)/$(BIN)-$(VERSION)"
