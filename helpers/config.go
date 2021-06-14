@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	toml "github.com/pelletier/go-toml"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // Version give the software version
@@ -57,7 +59,7 @@ type CONFIG struct {
 func GetConfig() *CONFIG {
 	config := &CONFIG{}
 	// set log formatter
-	log.SetFormatter(&log.JSONFormatter{})
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	// read toml config file
 	user, _ := user.Current()
@@ -67,17 +69,17 @@ func GetConfig() *CONFIG {
 	configFile := homeDir + "/.config/waybar/livestatus.toml"
 	file, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		log.Error(err)
+		log.Error().Err(err)
 	}
 	err = toml.Unmarshal(file, config)
 	if err != nil {
-		log.Error(err)
+		log.Error().Err(err)
 	}
-	fmt.Fprintf(os.Stderr, "Config file loaded: %s\n", configFile)
+	log.Info().Msgf("Config file loaded: %s\n", configFile)
 	config.HostsPatternString = strings.Join(config.HostsPattern, ",")
 	// check if 'client' not define in the toml config
 	if config.Client {
-		log.Fatal("You are not allowed to define 'client' mode in the config file!")
+		log.Fatal().Msg("You are not allowed to define 'client' mode in the config file!")
 	}
 
 	// override config values with values from cli
@@ -108,7 +110,9 @@ func GetConfig() *CONFIG {
 
 	// set log level
 	if config.Debug {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
 
 	// sanitize server
@@ -116,18 +120,18 @@ func GetConfig() *CONFIG {
 
 	// sanitize refresh
 	if config.Refresh < 15 {
-		log.Info("Refresh rate can't be under 15 seconds ! Fallback to default: 30 seconds")
+		log.Info().Msg("Refresh rate can't be under 15 seconds ! Fallback to default: 30 seconds")
 		config.Refresh = 30
 	}
 	if config.LongRefresh < 30 {
-		log.Info("Long refresh rate can't be under 30 seconds ! Fallback to default: 60 seconds")
+		log.Info().Msg("Long refresh rate can't be under 30 seconds ! Fallback to default: 60 seconds")
 		config.LongRefresh = 60
 	}
 	if config.NotificationSnoozeCycle < 0 {
 		config.NotificationSnoozeCycle = 10
 	}
 	if config.ServicesOnly && config.HostsOnly {
-		log.Error("The params services_only and hosts_only can't be set together")
+		log.Error().Msg("The params services_only and hosts_only can't be set together")
 		config.HostsOnly = false
 		config.ServicesOnly = false
 	}

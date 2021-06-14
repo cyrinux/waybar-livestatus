@@ -3,16 +3,17 @@ package server
 import (
 	"github.com/cyrinux/waybar-livestatus/alert"
 	"github.com/cyrinux/waybar-livestatus/helpers"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"log"
 	"net"
 	"os"
 )
 
 // GRPCListen start the gRPC server
 func GRPCListen(alertsChan chan []*helpers.Alert, config *helpers.CONFIG) {
-
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	go func() {
 		for {
 			alert.MenuEntries = <-alertsChan
@@ -27,7 +28,7 @@ func GRPCListen(alertsChan chan []*helpers.Alert, config *helpers.CONFIG) {
 	}()
 
 	if err != nil {
-		log.Fatalf("Failed to listen on unix socket: %v", err)
+		log.Fatal().Msgf("Failed to listen on unix socket: %v", err)
 	}
 	as := alert.Server{Config: config}
 
@@ -39,6 +40,6 @@ func GRPCListen(alertsChan chan []*helpers.Alert, config *helpers.CONFIG) {
 	alert.RegisterAlertServer(gs, &as)
 
 	if err := gs.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve gRPC over unix socket: %v", err)
+		log.Fatal().Msgf("Failed to serve gRPC over unix socket: %v", err)
 	}
 }

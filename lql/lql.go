@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	"github.com/hyperjumptech/jiffy"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	livestatus "github.com/vbatoufflet/go-livestatus"
-
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -29,11 +30,12 @@ type AlertStruct struct {
 
 func sanitizeObjectType(objectType string) {
 	if !(objectType == "hosts" || objectType == "services") {
-		log.Fatal("Bad objectType, valid are 'services' or 'hosts'")
+		log.Fatal().Msg("Bad objectType, valid are 'services' or 'hosts'")
 	}
 }
 
 func getQuery(objectType string, config *helpers.CONFIG) (q *livestatus.Query) {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	sanitizeObjectType(objectType)
 
@@ -61,9 +63,9 @@ func getQuery(objectType string, config *helpers.CONFIG) (q *livestatus.Query) {
 	}
 
 	countHosts := len(config.HostsPattern)
-	if countHosts > 1 {
+	if countHosts >= 1 {
 		for _, hostName := range config.HostsPattern {
-			log.Debugf("filter host_name ~ '%s'", hostName)
+			log.Debug().Msgf("filter host_name ~ '%s'", hostName)
 			hostFilter := fmt.Sprintf("host_name ~ %s", hostName)
 			q.Filter(hostFilter)
 		}
@@ -71,7 +73,7 @@ func getQuery(objectType string, config *helpers.CONFIG) (q *livestatus.Query) {
 	}
 	q.Limit(config.Limit)
 
-	log.Debug(q)
+	log.Debug().Msgf("%v", q)
 
 	return
 }
@@ -83,14 +85,14 @@ func getResponse(objectType string, c *livestatus.Client, q *livestatus.Query, c
 	sanitizeObjectType(objectType)
 
 	startTime := time.Now()
-	log.Debugf("start of LQL %s query", objectType)
+	log.Debug().Msgf("start of LQL %s query", objectType)
 	resp, err = c.Exec(q)
 	if err != nil {
-		log.Error(err)
+		log.Error().Err(err)
 		return
 	}
 	if resp.Status != 200 {
-		log.Errorf("bad LQL query status response code %v", resp.Status)
+		log.Error().Msgf("bad LQL query status response code %v", resp.Status)
 		return
 	}
 
@@ -99,11 +101,11 @@ func getResponse(objectType string, c *livestatus.Client, q *livestatus.Query, c
 	// if the query is two slow, use backoff
 	if int(duration.Seconds()) >= config.Refresh {
 		localRefresh = config.LongRefresh
-		log.Debugf("end of LQL %s query, took %v seconds, too slow, next refresh in %d seconds",
+		log.Debug().Msgf("end of LQL %s query, took %.3f seconds, too slow, next refresh in %d seconds",
 			objectType, duration.Seconds(), localRefresh)
 	} else {
 		localRefresh = config.Refresh
-		log.Debugf("end of LQL %s query, took %v seconds",
+		log.Debug().Msgf("end of LQL %s query, took %.3f seconds",
 			objectType, duration.Seconds())
 	}
 
@@ -158,24 +160,24 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 				if config.GetDuration {
 					lastHardStateChange, err := r.GetTime("last_hard_state_change")
 					if err != nil {
-						log.Warn(err)
+						log.Warn().Err(err)
 					}
 					lastHardStateChangeDuration = now.Sub(lastHardStateChange)
 				}
 
 				host, err := r.GetString("host_name")
 				if err != nil {
-					log.Warn(err)
+					log.Warn().Err(err)
 				}
 
 				state, err := r.GetInt("state")
 				if err != nil {
-					log.Warn(err)
+					log.Warn().Err(err)
 				}
 
 				desc, err := r.GetString("description")
 				if err != nil {
-					log.Warn(err)
+					log.Warn().Err(err)
 				}
 
 				// keep the worse state
@@ -188,7 +190,7 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 				// flapping handle
 				isFlapping, err := r.GetInt("is_flapping")
 				if err != nil {
-					log.Warn(err)
+					log.Warn().Err(err)
 				}
 				isFlappingStr := strconv.FormatInt(isFlapping, 10)
 				if isFlappingStr == "1" {
@@ -199,10 +201,10 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 
 				notesURL, err := r.GetString("notes_url")
 				if err != nil {
-					log.Warn(err)
+					log.Warn().Err(err)
 				} else {
 					if len(notesURL) > 0 {
-						log.Infof("%s: %s: %s", host, desc, notesURL)
+						log.Info().Msgf("%s: %s: %s", host, desc, notesURL)
 					}
 				}
 
@@ -235,7 +237,7 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 		}
 
 		// feed the alerts channel
-		log.Debugf("sending %d %s alerts", alert.Count, objectType)
+		log.Debug().Msgf("sending %d %s alerts", alert.Count, objectType)
 
 		alertChannel <- alert
 

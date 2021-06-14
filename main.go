@@ -11,10 +11,14 @@ import (
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	"github.com/cyrinux/waybar-livestatus/lql"
 	"github.com/cyrinux/waybar-livestatus/server"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *helpers.CONFIG) (wOutput helpers.WaybarOutput) {
+func formatData(
+	hAlerts *lql.AlertStruct,
+	sAlerts *lql.AlertStruct,
+	config *helpers.CONFIG) (wOutput helpers.WaybarOutput) {
 
 	// format
 	globalClass := "ok"
@@ -73,6 +77,7 @@ func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *help
 }
 
 func main() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	// get config
 	var config = helpers.GetConfig()
@@ -86,7 +91,7 @@ func main() {
 	if config.Client {
 		err := client.Start(config)
 		if err != nil {
-			log.Error(err)
+			log.Error().Msgf("%v", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -121,15 +126,15 @@ func main() {
 	// Start gRPC server
 	go server.GRPCListen(serverChannel, config)
 
-	log.Debugf("Refresh rate: %d seconds, long refresh: %d seconds", config.Refresh, config.LongRefresh)
+	log.Debug().Msgf("Refresh rate: %d seconds, long refresh: %d seconds", config.Refresh, config.LongRefresh)
 
 	// main loop
 	for {
 		select {
 		case *sAlerts = <-serviceAlerts:
-			log.Debugf("received %d service alerts", sAlerts.Count)
+			log.Debug().Msgf("received %d service alerts", sAlerts.Count)
 		case *hAlerts = <-hostAlerts:
-			log.Debugf("received %d hosts alerts", hAlerts.Count)
+			log.Debug().Msgf("received %d hosts alerts", hAlerts.Count)
 		default:
 			// nothing receive, sleep a little
 			time.Sleep(500 * time.Millisecond)
@@ -151,7 +156,7 @@ func main() {
 		// convert in JSON
 		jsonOutput, err := json.Marshal(wOutput)
 		if err != nil {
-			log.Error(err)
+			log.Error().Msgf("%v", err)
 		}
 
 		// Finally print the expected waybar JSON

@@ -3,8 +3,10 @@ package alert
 import (
 	"fmt"
 	"github.com/cyrinux/waybar-livestatus/helpers"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
+	"os"
 )
 
 // MenuEntries contains the alerts list
@@ -41,7 +43,9 @@ func (s *Server) GetAlertsList(ctx context.Context, message *RequestAlert) (*Res
 
 // GetNotesURL return the notes_url from a host / service
 func (s *Server) GetNotesURL(ctx context.Context, message *RequestAlert) (*ResponseAlert, error) {
-	log.Debugf("Received message body from client: %s / %s", message.Host, message.Service)
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.Debug().Msgf("Received message body from client: %s / %s", message.Host, message.Service)
 
 	for _, alert := range MenuEntries {
 		if alert.Host == message.Host && alert.Desc == message.Service {

@@ -3,7 +3,9 @@ package helpers
 import (
 	"fmt"
 	notify "github.com/TheCreeper/go-notify"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"os"
 	"strings"
 )
 
@@ -41,12 +43,14 @@ func send(alert *Alert, icon string) (notification *notify.Notification, err err
 // SendNotification send a notification
 func SendNotification(notifications chan *Alert, config *CONFIG) {
 
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	alertsWithCounter := make(map[Alert]int)
 
 	if config.Debug {
 		startAlert := Alert{Host: "Livestatus", Desc: fmt.Sprintf("starting version %v", Version)}
-		if notification, err := send(&startAlert, ""); err != nil {
-			log.Errorf("Error sending notification: %v", notification)
+		if _, err := send(&startAlert, ""); err != nil {
+			log.Error().Msgf("Error sending notification: %v", err)
 		}
 	}
 
@@ -69,12 +73,12 @@ func SendNotification(notifications chan *Alert, config *CONFIG) {
 
 		if alertsWithCounter[*notification] == 0 {
 			if notification, err := send(notification, ""); err != nil {
-				log.Errorf("Error sending notification: %v", notification)
+				log.Error().Msgf("Error sending notification: %+v", notification)
 			}
 		}
 
 		alertsWithCounter[*notification]++
 
-		log.Debugf("%v sent %d times", notification, alertsWithCounter[*notification])
+		log.Debug().Msgf("%v sent %d times", notification, alertsWithCounter[*notification])
 	}
 }
