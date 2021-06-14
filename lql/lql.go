@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	statusCritical = 2
-	statusWarning  = 1
 	statusOK       = 0
+	statusWarning  = 1
+	statusCritical = 2
+	statusUnknown  = 3
 )
 
 // AlertStruct define an alert
@@ -189,7 +190,6 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 				if err != nil {
 					log.Warn(err)
 				}
-
 				isFlappingStr := strconv.FormatInt(isFlapping, 10)
 				if isFlappingStr == "1" {
 					isFlappingStr = config.FlappingIcon
