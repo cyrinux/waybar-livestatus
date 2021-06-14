@@ -3,8 +3,10 @@ package lql
 import (
 	"fmt"
 	"github.com/cyrinux/waybar-livestatus/helpers"
+	"github.com/hyperjumptech/jiffy"
 	log "github.com/sirupsen/logrus"
 	livestatus "github.com/vbatoufflet/go-livestatus"
+
 	"strconv"
 	"strings"
 	"time"
@@ -137,7 +139,12 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 		if err != nil {
 			class = "error"
 			count := 0
-			alert = AlertStruct{Count: count, Items: items, Class: class, Error: err}
+			alert = AlertStruct{
+				Count: count,
+				Items: items,
+				Class: class,
+				Error: err,
+			}
 			time.Sleep(10 * time.Second)
 		} else {
 			class = "ok"
@@ -206,7 +213,7 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 				}
 
 				if config.GetDuration {
-					item += fmt.Sprintf("  since %s\n", lastHardStateChangeDuration.Round(1*time.Second))
+					item += fmt.Sprintf(" since %s\n", jiffy.DescribeDuration(lastHardStateChangeDuration, jiffy.NewWant()))
 				}
 
 				// notifications

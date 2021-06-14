@@ -10,8 +10,9 @@ import (
 	"os"
 )
 
-// Listen start the gRPC server
+// GRPCListen start the gRPC server
 func GRPCListen(alertsChan chan []*helpers.Alert, config *helpers.CONFIG) {
+
 	go func() {
 		for {
 			alert.MenuEntries = <-alertsChan

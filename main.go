@@ -3,14 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/cyrinux/waybar-livestatus/client"
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	"github.com/cyrinux/waybar-livestatus/lql"
 	"github.com/cyrinux/waybar-livestatus/server"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"strings"
-	"time"
 )
 
 func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *helpers.CONFIG) (wOutput helpers.WaybarOutput) {
@@ -61,7 +62,12 @@ func formatData(hAlerts *lql.AlertStruct, sAlerts *lql.AlertStruct, config *help
 	text = strings.TrimRight(text, "\n")
 
 	// waybar output
-	wOutput = helpers.WaybarOutput{Text: text, Tooltip: tooltip, Class: globalClass, Count: hostAlertsCount + serviceAlertsCount}
+	wOutput = helpers.WaybarOutput{
+		Text:    text,
+		Tooltip: tooltip,
+		Class:   globalClass,
+		Count:   hostAlertsCount + serviceAlertsCount,
+	}
 
 	return
 }
@@ -116,6 +122,7 @@ func main() {
 	go server.GRPCListen(serverChannel, config)
 
 	log.Debugf("Refresh rate: %d seconds, long refresh: %d seconds", config.Refresh, config.LongRefresh)
+
 	// main loop
 	for {
 		select {
