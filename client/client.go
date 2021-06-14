@@ -1,7 +1,7 @@
 package client
 
 import (
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/cyrinux/waybar-livestatus/alert"
@@ -16,7 +16,8 @@ func Start(config *helpers.CONFIG) (err error) {
 	sock := "passthrough:///unix://" + os.Getenv("XDG_RUNTIME_DIR") + "/waybar-livestatus.sock"
 	conn, err = grpc.Dial(sock, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("could not connect: %s", err)
+		fmt.Fprintf(os.Stderr, "could not connect: %s", err)
+		return
 	}
 	defer conn.Close()
 	c := alert.NewAlertClient(conn)
@@ -37,18 +38,21 @@ func Start(config *helpers.CONFIG) (err error) {
 		var response *alert.ResponseAlertsList
 		response, err = c.GetAlertsList(context.Background(), &message)
 		if err != nil {
-			log.Fatalf("Error when calling GetAlertsList: %s", err)
+			fmt.Fprintf(os.Stderr, "Error when calling GetAlertsList: %s", err)
 		}
-		log.Print(response.List)
+		fmt.Println(response.List)
 		return
 	}
 
 	var response *alert.ResponseAlert
 	response, err = c.GetNotesURL(context.Background(), &message)
 	if err != nil {
-		log.Fatalf("Error when calling GetNotesUrl: %s", err)
+		fmt.Fprintf(os.Stderr, "Error when calling GetNotesUrl: %s", err)
+		return
 	}
-	log.Print(response.NotesUrl)
+	if response.NotesUrl != "" {
+		fmt.Print(response.NotesUrl)
+	}
 
 	return
 }

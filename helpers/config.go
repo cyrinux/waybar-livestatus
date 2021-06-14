@@ -127,7 +127,7 @@ func GetConfig() *CONFIG {
 		config.NotificationSnoozeCycle = 10
 	}
 	if config.ServicesOnly && config.HostsOnly {
-		log.Error("services_only and hosts_only can't be set together")
+		log.Error("The params services_only and hosts_only can't be set together")
 		config.HostsOnly = false
 		config.ServicesOnly = false
 	}

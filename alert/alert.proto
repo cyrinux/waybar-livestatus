@@ -19,7 +19,6 @@ message ResponseAlertsList {
     string List = 1;
 }
 
-
 service Alert {
     rpc GetNotesURL(RequestAlert) returns (ResponseAlert) {}
     rpc GetAlertsList(RequestAlert) returns (ResponseAlertsList) {}
