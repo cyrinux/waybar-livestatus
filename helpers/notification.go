@@ -2,8 +2,9 @@ package helpers
 
 import (
 	"fmt"
-	notifier "github.com/blakek/go-notifier"
+	notify "github.com/TheCreeper/go-notify"
 	log "github.com/sirupsen/logrus"
+	"strings"
 )
 
 // Alert define a event
@@ -14,19 +15,26 @@ type Alert struct {
 	NotesURL string
 }
 
-func notify(title, message, icon string) (notification *notifier.Notification, err error) {
+func send(alert *Alert, icon string) (notification *notify.Notification, err error) {
 	if icon == "" {
 		icon = "/usr/share/icons/Adwaita/32x32/legacy/dialog-warning.png"
 	}
-	notification = &notifier.Notification{Title: title, Message: message, ImagePath: icon}
-	notifier, err := notifier.NewNotifier()
-	if err != nil {
-		log.Error(err)
+	ntf := notify.NewNotification(alert.Host, alert.Desc)
+	ntf.AppIcon = icon
+	ntf.Hints = make(map[string]interface{})
+	ntf.Hints[notify.HintSoundFile] = "/usr/share/sounds/freedesktop/stereo/dialog-warning.oga"
+	if strings.Contains(alert.Class, "critical") {
+		ntf.Hints[notify.HintUrgency] = notify.UrgencyCritical
+	} else if strings.Contains(alert.Class, "warning") {
+		ntf.Hints[notify.HintUrgency] = notify.UrgencyNormal
+	} else {
+		ntf.Hints[notify.HintUrgency] = notify.UrgencyLow
+	}
+
+	if _, err = ntf.Show(); err != nil {
 		return
 	}
-	if err := notifier.DeliverNotification(*notification); err != nil {
-		log.Error(err)
-	}
+
 	return
 }
 
@@ -36,7 +44,8 @@ func SendNotification(notifications chan *Alert, config *CONFIG) {
 	alertsWithCounter := make(map[Alert]int)
 
 	if config.Debug {
-		if notification, err := notify("Livestatus", fmt.Sprintf("starting version %v", Version), ""); err != nil {
+		startAlert := Alert{Host: "Livestatus", Desc: fmt.Sprintf("starting version %v", Version)}
+		if notification, err := send(&startAlert, ""); err != nil {
 			log.Errorf("Error sending notification: %v", notification)
 		}
 	}
@@ -59,7 +68,7 @@ func SendNotification(notifications chan *Alert, config *CONFIG) {
 		}
 
 		if alertsWithCounter[*notification] == 0 {
-			if notification, err := notify(notification.Host, notification.Desc, ""); err != nil {
+			if notification, err := send(notification, ""); err != nil {
 				log.Errorf("Error sending notification: %v", notification)
 			}
 		}

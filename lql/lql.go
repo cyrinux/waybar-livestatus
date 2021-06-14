@@ -213,7 +213,7 @@ func GetItems(objectType string, config *helpers.CONFIG, alertChannel chan Alert
 				}
 
 				if config.GetDuration {
-					item += fmt.Sprintf(" since %s\n", jiffy.DescribeDuration(lastHardStateChangeDuration, jiffy.NewWant()))
+					item += fmt.Sprintf("since %s\n", jiffy.DescribeDuration(lastHardStateChangeDuration, jiffy.NewWant()))
 				}
 
 				// notifications
