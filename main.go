@@ -28,8 +28,8 @@ func formatData(
 	// test and format
 	var hostAlertsCount = int(hAlerts.Count)
 	if hostAlertsCount > 0 {
-		icon = config.HostPrefix + " "
-		text += fmt.Sprintf("%s %d", icon, hAlerts.Count)
+		icon = fmt.Sprintf(" %s ", config.HostPrefix)
+		text += fmt.Sprintf("%s%d", icon, hAlerts.Count)
 		tooltip += fmt.Sprintf("<b>Hosts: %d</b>\n\n%s", hAlerts.Count, hAlerts.Items)
 		globalClass = hAlerts.Class
 	}
@@ -41,29 +41,34 @@ func formatData(
 		}
 
 		tooltip += fmt.Sprintf("<b>Services: %d</b>\n\n%s", sAlerts.Count, sAlerts.Items)
-		if len(text) > 0 {
+		if len(strings.TrimSpace(text)) > 0 {
 			text += " | "
 		}
-		icon = config.ServicePrefix + " "
-		text += fmt.Sprintf("%s %d", icon, sAlerts.Count)
+		icon = fmt.Sprintf(" %s ", strings.TrimSpace(config.ServicePrefix))
+		text += fmt.Sprintf("%s%d", icon, sAlerts.Count)
 		globalClass += sAlerts.Class
 	}
 
-	if len(text) == 0 {
-		icon = " " + config.OkPrefix + " "
+	if len(strings.TrimSpace(text)) == 0 {
+		icon = fmt.Sprintf(" %s ", strings.TrimSpace(config.OkPrefix))
 		text = icon
 	}
 
 	// on error
 	if hAlerts.Error != nil || sAlerts.Error != nil {
-		icon = " " + config.ErrorPrefix + " "
+		icon = fmt.Sprintf(" %s ", strings.TrimSpace(config.ErrorPrefix))
 		text = icon
 		tooltip = "Can't connect to the livestatus server"
 		globalClass = "error"
 	}
 
 	tooltip = strings.TrimRight(tooltip, "\n")
-	text = strings.TrimRight(text, "\n")
+
+	if len(strings.TrimSpace(text)) == 0 {
+		text = strings.TrimSpace(text)
+	} else {
+		text = strings.TrimRight(text, "\n")
+	}
 
 	// waybar output
 	wOutput = helpers.WaybarOutput{

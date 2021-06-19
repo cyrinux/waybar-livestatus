@@ -17,7 +17,7 @@ type Alert struct {
 	NotesURL string
 }
 
-func send(alert *Alert, icon string) (notification *notify.Notification, err error) {
+func createNotification(alert *Alert, icon string) (notification *notify.Notification, err error) {
 	if icon == "" {
 		icon = "/usr/share/icons/Adwaita/32x32/legacy/dialog-warning.png"
 	}
@@ -49,7 +49,7 @@ func SendNotification(notifications chan *Alert, config *CONFIG) {
 
 	if config.Debug {
 		startAlert := Alert{Host: "Livestatus", Desc: fmt.Sprintf("starting version %v", Version)}
-		if _, err := send(&startAlert, ""); err != nil {
+		if _, err := createNotification(&startAlert, ""); err != nil {
 			log.Error().Msgf("Error sending notification: %v", err)
 		}
 	}
@@ -72,7 +72,7 @@ func SendNotification(notifications chan *Alert, config *CONFIG) {
 		}
 
 		if alertsWithCounter[*notification] == 0 {
-			if notification, err := send(notification, ""); err != nil {
+			if notification, err := createNotification(notification, ""); err != nil {
 				log.Error().Msgf("Error sending notification: %+v", notification)
 			}
 		}
