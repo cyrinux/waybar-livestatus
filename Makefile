@@ -23,6 +23,11 @@ run: local
 build: main.go
 	go build -trimpath -ldflags "-X github.com/cyrinux/waybar-livestatus/helpers.Version=$(VERSION) -linkmode=external" -o $(BIN) main.go
 
+.PHONY: debug
+debug: main.go
+	go build -gcflags='all=-N -l' -ldflags "-X github.com/cyrinux/waybar-livestatus/helpers.Version=$(VERSION) -linkmode=external" -o $(BIN) main.go
+	dlv exec ./waybar-livestatus
+
 .PHONY: release
 release: build
 	strip $(BIN) 2>/dev/null || true
