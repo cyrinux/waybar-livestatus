@@ -1,6 +1,6 @@
 module github.com/cyrinux/waybar-livestatus
 
-go 1.15
+go 1.18
 
 require (
 	github.com/TheCreeper/go-notify v0.2.0
@@ -12,4 +12,13 @@ require (
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0
+)
+
+require (
+	github.com/antlr/antlr4 v0.0.0-20200124162019-2d7f727a00b7 // indirect
+	github.com/godbus/dbus/v5 v5.0.4 // indirect
+	github.com/golang/protobuf v1.4.2 // indirect
+	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
+	golang.org/x/text v0.3.3 // indirect
+	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 )
