@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/cyrinux/waybar-livestatus/alert";
+option go_package = "/alert";
 
 package alert;
 

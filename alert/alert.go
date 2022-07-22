@@ -2,11 +2,12 @@ package alert
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
-	"os"
 )
 
 // MenuEntries contains the alerts list

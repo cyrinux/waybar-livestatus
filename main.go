@@ -1,3 +1,5 @@
+//go:generate protoc --proto_path=. --descriptor_set_out=./alert/alert.protoset --include_imports ./alert/alert.proto
+//go:generate protoc --proto_path=. -I/usr/include -I. -Ivendor --go_out=plugins=grpc:. ./alert/alert.proto
 package main
 
 import (

@@ -1,18 +1,21 @@
 package helpers
 
 import (
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // Pause state
 var Pause = false
 
+// SleepTime is the sleep time of
+// the signal handler loop
 const SleepTime = 500
 
 // SetPause pause the polling
@@ -30,12 +33,14 @@ func SetResume() {
 	Pause = false
 }
 
+// togglePause toggle status
 func togglePause(sig os.Signal) {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	Pause = !Pause
 	log.Info().Msgf("Signal %v, pause %v", sig, Pause)
 }
 
+// stopSignal stop the program properly
 func stopSignal() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	log.Debug().Msg("Cleaning unix sock file and exit")

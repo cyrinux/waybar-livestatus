@@ -1,14 +1,14 @@
 package server
 
 import (
+	"net"
+	"os"
+
 	"github.com/cyrinux/waybar-livestatus/alert"
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
-	"net"
-	"os"
 )
 
 // GRPCListen start the gRPC server
@@ -33,9 +33,6 @@ func GRPCListen(alertsChan chan []*helpers.Alert, config *helpers.CONFIG) {
 	as := alert.Server{Config: config}
 
 	gs := grpc.NewServer()
-
-	// Allow method discovery
-	reflection.Register(gs)
 
 	alert.RegisterAlertServer(gs, &as)
 

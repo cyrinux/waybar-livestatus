@@ -2,15 +2,16 @@ package lql
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/cyrinux/waybar-livestatus/helpers"
 	"github.com/hyperjumptech/jiffy"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	livestatus "github.com/vbatoufflet/go-livestatus"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (

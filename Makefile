@@ -19,6 +19,10 @@ local: vendor build
 run: local
 	go run main.go
 
+.PHONY: generate
+generate:
+	go generate -mod=vendor ./...
+
 .PHONY: build
 build: main.go
 	go build -trimpath -ldflags "-X github.com/cyrinux/waybar-livestatus/helpers.Version=$(VERSION) -linkmode=external" -o $(BIN) main.go
@@ -97,3 +101,11 @@ install:
 	install -Dm755 -t "$(BIN_DIR)/" $(BIN)
 	install -Dm644 -t "$(SHARE_DIR)/licenses/$(BIN)/" LICENSE.md
 	install -Dm644 -t "$(SHARE_DIR)/doc/$(BIN)/" README.md example/livestatus.toml example/style.css
+
+.PHONY: graphviz
+graphviz:
+	@protodot -inc vendor,proto -src alert/alert.proto -output alert
+	@dot -Tpng ~/protodot/generated/alert.dot -o alert.dot.png
+	@dot -Tsvg ~/protodot/generated/alert.dot -o alert.dot.svg
+	@rm -vf ~/protodot/generated/alert*
+	@xdg-open alert.dot.png
