@@ -15,9 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Version give the software version
-var Version string
-
 // CONFIG define the configuration content
 type CONFIG struct {
 	Server                        string   `toml:"server" default:""`
@@ -29,7 +26,6 @@ type CONFIG struct {
 	Debug                         bool   `toml:"debug" default:"false"`
 	Popup                         bool   `toml:"popup" default:"true"`
 	Warnings                      bool   `toml:"warnings" default:"true"`
-	Version                       bool   `default:"false"`
 	NotificationSnoozeCycle       int    `toml:"notification_snooze_cycle" default:"10"`
 	Acknowledged                  int    `toml:"acknowledged" default:"0"`
 	NotificationsEnabled          int    `toml:"notifications_enabled" default:"1"`
@@ -87,7 +83,6 @@ func GetConfig() *CONFIG {
 	flag.BoolVar(&config.Client, "c", false, "Client mode.")
 	flag.BoolVar(&config.NotesURL, "u", config.NotesURL, "Display notes_url.")
 	flag.BoolVar(&config.Popup, "n", config.Popup, "Disable notification popup alert.")
-	flag.BoolVar(&config.Version, "V", false, "Print version and exit.")
 	flag.BoolVar(&config.Warnings, "w", config.Warnings, "Get also state warnings. Default show critical only.")
 
 	flag.IntVar(&config.Refresh, "r", config.Refresh, "Refresh rate in seconds. Min 15.")

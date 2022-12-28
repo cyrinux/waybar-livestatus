@@ -89,11 +89,6 @@ func main() {
 	// get config
 	var config = helpers.GetConfig()
 
-	if config.Version {
-		fmt.Println("Waybar Livestatus version:", helpers.Version)
-		os.Exit(0)
-	}
-
 	// start the client and exit
 	if config.Client {
 		err := client.Start(config)

@@ -25,17 +25,12 @@ generate:
 
 .PHONY: build
 build: main.go
-	go build -trimpath -ldflags "-X github.com/cyrinux/waybar-livestatus/helpers.Version=$(VERSION) -linkmode=external" -o $(BIN) main.go
+	go build -o $(BIN) main.go
 
 .PHONY: debug
 debug: main.go
-	go build -gcflags='all=-N -l' -ldflags "-X github.com/cyrinux/waybar-livestatus/helpers.Version=$(VERSION) -linkmode=external" -o $(BIN) main.go
+	go build -o $(BIN) main.go
 	dlv exec ./waybar-livestatus
-
-.PHONY: release
-release: build
-	strip $(BIN) 2>/dev/null || true
-	upx -9 $(BIN) 2>/dev/null || true
 
 .PHONY: vendor
 vendor:
@@ -109,3 +104,7 @@ graphviz:
 	@dot -Tsvg ~/protodot/generated/alert.dot -o alert.dot.svg
 	@rm -vf ~/protodot/generated/alert*
 	@xdg-open alert.dot.png
+
+.PHONY: release
+release:
+	goreleaser --rm-dist

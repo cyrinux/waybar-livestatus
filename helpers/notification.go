@@ -2,11 +2,12 @@ package helpers
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	notify "github.com/TheCreeper/go-notify"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"os"
-	"strings"
 )
 
 // Alert define a event
@@ -48,7 +49,7 @@ func SendNotification(notifications chan *Alert, config *CONFIG) {
 	alertsWithCounter := make(map[Alert]int)
 
 	if config.Debug {
-		startAlert := Alert{Host: "Livestatus", Desc: fmt.Sprintf("starting version %v", Version)}
+		startAlert := Alert{Host: "Livestatus", Desc: fmt.Sprint("starting")}
 		if _, err := createNotification(&startAlert, ""); err != nil {
 			log.Error().Msgf("Error sending notification: %v", err)
 		}
